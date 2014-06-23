@@ -14,6 +14,7 @@ except ImportError:
 import qiniu.conf
 import qiniu.io
 import qiniu.rs
+import qiniu.fop
 import qiniu.rsf
 import requests
 
@@ -140,6 +141,9 @@ class QiniuStorage(Storage):
     def url(self, name):
         return urljoin("http://" + self.bucket_domain, name)
 
+    def path(self, name):
+        return self.url(name)
+
 class QiniuMediaStorage(QiniuStorage):
     location = settings.MEDIA_ROOT.strip('/')
 
@@ -148,8 +152,8 @@ class QiniuStaticStorage(QiniuStorage):
 
 class QiniuFile(File):
     def __init__(self, name, storage, mode):
-        self._name = name[len(self._storage.location):].lstrip('/')
         self._storage = storage
+        self._name = name[len(self._storage.location):].lstrip('/')
         self._mode = mode
         self.file = StringIO()
         self._is_dirty = False
@@ -165,6 +169,8 @@ class QiniuFile(File):
         if not self._is_read:
             self.file = StringIO(self._storage._read(self._name))
             self._is_read = True
+        if num_bytes is None:
+            return self.file.read()
         return self.file.read(num_bytes)
 
     def write(self, content):
@@ -178,3 +184,12 @@ class QiniuFile(File):
         if self._is_dirty:
             self._storage._put_file(self._name, self.file.getvalue())
         self.file.close()
+
+    def thumbnail_url(self, width=None, height=None, quality=None, format=None):
+        base_url = self._storage.url(self._name)
+        iv = qiniu.fop.ImageView()
+        iv.width = width
+        iv.height = height
+        iv.quality = quality
+        iv.format = format
+        return iv.make_request(base_url)

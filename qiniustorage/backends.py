@@ -69,7 +69,7 @@ class QiniuStorage(Storage):
         else:
             return name
     def _normalize_name(self, name):
-        return ("%s/%s"% (self.location, name.lstrip('/'))).lstrip('/')
+        return os.path.join(self.location, name).lstrip('/')
 
     def _open(self, name, mode='rb'):
         return QiniuFile(name, self, mode)
@@ -139,7 +139,7 @@ class QiniuStorage(Storage):
         return list(dirs), files
 
     def url(self, name):
-        return urljoin("http://" + self.bucket_domain, name)
+        return urljoin("http://" + self.bucket_domain, os.path.join(self.location, name))
 
     def path(self, name):
         return self.url(name)

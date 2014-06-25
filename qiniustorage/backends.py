@@ -185,9 +185,10 @@ class QiniuFile(File):
             self._storage._put_file(self._name, self.file.getvalue())
         self.file.close()
 
-    def thumbnail_url(self, width=None, height=None, quality=None, format=None):
+    def thumbnail_url(self, width=None, height=None, quality=None, format=None, mode=2):
         base_url = self._storage.url(self._name)
         iv = qiniu.fop.ImageView()
+        iv.mode = mode
         iv.width = width
         iv.height = height
         iv.quality = quality

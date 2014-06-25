@@ -62,8 +62,10 @@ class AsyncPutView(GenericAPIView):
         try:
             self.pre_save(tgt)
             tgt.save()
+            self.post_save(tgt, True)
         except Exception, e:
             logging.error('error',exc_info=e)
+            
         return Response({
             'key': request.DATA['key'],
             'pk': tgt.pk

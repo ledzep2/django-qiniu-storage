@@ -3,7 +3,7 @@ Qiniu Storage Backends
 """
 from __future__ import absolute_import
 import datetime
-import os
+import os, mimetypes
 from urlparse import urljoin
 
 try:
@@ -26,13 +26,13 @@ from django.core.exceptions import ImproperlyConfigured
 from .utils import bucket_lister
 
 
-def get_qiniu_config(name):
+def get_qiniu_config(name, default=None):
     """
     Get configuration variable from environment variable
     or django setting.py
     """
-    config = os.environ.get(name, getattr(settings, name, None))
-    if config:
+    config = os.environ.get(name, getattr(settings, name, default))
+    if config is not None:
         return config
     else:
         raise ImproperlyConfigured(
@@ -44,7 +44,8 @@ QINIU_ACCESS_KEY = get_qiniu_config('QINIU_ACCESS_KEY')
 QINIU_SECRET_KEY = get_qiniu_config('QINIU_SECRET_KEY')
 QINIU_BUCKET_NAME = get_qiniu_config('QINIU_BUCKET_NAME')
 QINIU_BUCKET_DOMAIN = get_qiniu_config('QINIU_BUCKET_DOMAIN')
-
+QINIU_BUCKET_PUBLIC = get_qiniu_config('QINIU_BUCKET_PUBLIC', True)
+QINIU_ACCESS_EXPIRATION = get_qiniu_config('QINIU_ACCESS_EXPIRATION', 3600)
 
 class QiniuStorage(Storage):
     """
@@ -56,10 +57,14 @@ class QiniuStorage(Storage):
             access_key=QINIU_ACCESS_KEY,
             secret_key=QINIU_SECRET_KEY,
             bucket_name=QINIU_BUCKET_NAME,
-            bucket_domain=QINIU_BUCKET_DOMAIN):
+            bucket_domain=QINIU_BUCKET_DOMAIN,
+            bucket_public=QINIU_BUCKET_PUBLIC,
+            expiration=QINIU_ACCESS_EXPIRATION):
         qiniu.conf.ACCESS_KEY = access_key
         qiniu.conf.SECRET_KEY = secret_key
+        self.public = bucket_public
         self.bucket_name = bucket_name
+        self.expiration = expiration
         self.put_policy = qiniu.rs.PutPolicy(self.bucket_name)
         self.bucket_domain = bucket_domain
 
@@ -139,7 +144,13 @@ class QiniuStorage(Storage):
         return list(dirs), files
 
     def url(self, name):
-        return urljoin("http://" + self.bucket_domain, os.path.join(self.location, name))
+        u = urljoin("http://" + self.bucket_domain, os.path.join(self.location, name))
+        if self.public:
+            return u
+
+        gp = qiniu.rs.GetPolicy()
+        gp.expires = self.expiration
+        return gp.make_request(u)
 
     def path(self, name):
         return self.url(name)
@@ -187,10 +198,16 @@ class QiniuFile(File):
 
     def thumbnail_url(self, width=None, height=None, quality=None, format=None, mode=2):
         base_url = self._storage.url(self._name)
-        iv = qiniu.fop.ImageView()
-        iv.mode = mode
-        iv.width = width
-        iv.height = height
-        iv.quality = quality
-        iv.format = format
-        return iv.make_request(base_url)
+        mtype = mimetypes.guess_type(base_url)
+        mtype = mtype[0] and mtype[0] or "unknown"
+
+        if mtype.startswith('image'):
+            iv = qiniu.fop.ImageView()
+            iv.width = width
+            iv.height = height
+            iv.quality = quality
+            iv.mode = mode
+            iv.format = format
+            return iv.make_request(base_url)
+
+        return None

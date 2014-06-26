@@ -197,8 +197,7 @@ class QiniuFile(File):
         self.file.close()
 
     def thumbnail_url(self, width=None, height=None, quality=None, format=None, mode=2):
-        base_url = self._storage.url(self._name)
-        mtype = mimetypes.guess_type(base_url)
+        mtype = mimetypes.guess_type(self._name)
         mtype = mtype[0] and mtype[0] or "unknown"
 
         if mtype.startswith('image'):
@@ -208,6 +207,6 @@ class QiniuFile(File):
             iv.quality = quality
             iv.mode = mode
             iv.format = format
-            return iv.make_request(base_url)
+            return self._storage.url(iv.make_request(self._name))
 
         return None

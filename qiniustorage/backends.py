@@ -51,7 +51,7 @@ class QiniuStorage(Storage):
     """
     Qiniu Storage Service
     """
-    location = ""
+    location = u""
     def __init__(
             self,
             access_key=QINIU_ACCESS_KEY,
@@ -144,13 +144,14 @@ class QiniuStorage(Storage):
         return list(dirs), files
 
     def url(self, name):
-        u = urljoin("http://" + self.bucket_domain, os.path.join(self.location, name))
+        u = urljoin(u"http://" + self.bucket_domain, os.path.join(self.location, name))
         if self.public:
             return u
 
         gp = qiniu.rs.GetPolicy()
         gp.expires = self.expiration
-        return gp.make_request(u)
+        
+        return gp.make_request(u.encode('utf-8')).decode('utf-8')
 
     def path(self, name):
         return self.url(name)

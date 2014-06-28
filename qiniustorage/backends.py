@@ -5,6 +5,7 @@ from __future__ import absolute_import
 import datetime
 import os, mimetypes
 from urlparse import urljoin
+from urllib import quote
 
 try:
     from cStringIO import StringIO
@@ -51,7 +52,7 @@ class QiniuStorage(Storage):
     """
     Qiniu Storage Service
     """
-    location = u""
+    location = ""
     def __init__(
             self,
             access_key=QINIU_ACCESS_KEY,
@@ -144,14 +145,23 @@ class QiniuStorage(Storage):
         return list(dirs), files
 
     def url(self, name):
-        u = urljoin(u"http://" + self.bucket_domain, os.path.join(self.location, name))
+        tmp = name.split('?')
+        if len(tmp) == 2:
+            name = tmp[0]
+            query = '?' + tmp[1]
+        else:
+            query = ""
+        path = os.path.join(self.location, name)
+        path = quote(path.encode('utf-8'))
+        u = urljoin("http://" + self.bucket_domain, path)
+        u += query
         if self.public:
             return u
 
         gp = qiniu.rs.GetPolicy()
         gp.expires = self.expiration
         
-        return gp.make_request(u.encode('utf-8')).decode('utf-8')
+        return gp.make_request(u).decode('utf-8')
 
     def path(self, name):
         return self.url(name)

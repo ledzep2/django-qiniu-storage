@@ -13,6 +13,7 @@ from .backends import QiniuStorage
 class AsyncPutView(GenericAPIView):
     model = None
     target_model = None
+    target_serializer = None
     target_field = None
     target_field_class = FieldFile
     storage_class = QiniuStorage 
@@ -30,6 +31,7 @@ class AsyncPutView(GenericAPIView):
         return self.storage_class()._normalize_name(os.path.join(self.get_base_path(), filename))
 
     def get(self, request, *args, **kwargs):
+        """ GET method grant the upload token of qiuniu """
         filename = kwargs.pop('filename')
         bucket_name = self.bucket_name and self.bucket_name or settings.QINIU_BUCKET_NAME
         key = self.get_upload_key(filename)
@@ -46,6 +48,7 @@ class AsyncPutView(GenericAPIView):
         }, status = status.HTTP_200_OK)
     
     def post(self, request, *args, **kwargs):
+        """ POST method create the target model with the key of qiniu file """
         tgt = self.target_model()
         field = None
         for f in self.target_model._meta.fields:
@@ -66,9 +69,12 @@ class AsyncPutView(GenericAPIView):
         except Exception, e:
             logging.error('error',exc_info=e)
             
-        return Response({
-            'key': request.DATA['key'],
-            'pk': tgt.pk
-        }, status = status.HTTP_201_CREATED)
+        data = {
+            'qiniu_key': request.DATA['key'],
+        }
+        if self.target_serializer:
+            data.update(self.target_serializer(tgt).data)
+            
+        return Response(data, status = status.HTTP_201_CREATED)
 
         
